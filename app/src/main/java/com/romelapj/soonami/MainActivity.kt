@@ -3,6 +3,7 @@ package com.romelapj.soonami
 import android.os.AsyncTask
 import android.os.Bundle
 import android.support.v7.app.AppCompatActivity
+import android.text.TextUtils
 import android.util.Log
 import android.view.View
 import android.widget.TextView
@@ -63,10 +64,10 @@ class MainActivity : AppCompatActivity() {
      * Return the display string for whether or not there was a tsunami alert for an earthquake.
      */
     private fun getTsunamiAlertString(tsunamiAlert: Int): String {
-        when (tsunamiAlert) {
-            0 -> return getString(R.string.alert_no)
-            1 -> return getString(R.string.alert_yes)
-            else -> return getString(R.string.alert_not_available)
+        return when (tsunamiAlert) {
+            0 -> getString(R.string.alert_no)
+            1 -> getString(R.string.alert_yes)
+            else -> getString(R.string.alert_not_available)
         }
     }
 
@@ -83,7 +84,7 @@ class MainActivity : AppCompatActivity() {
             // Perform HTTP request to the URL and receive a JSON response back
             var jsonResponse = ""
             try {
-                jsonResponse = makeHttpRequest(url!!)
+                jsonResponse = makeHttpRequest(url)
             } catch (e: IOException) {
                 // TODO Handle the IOException
             }
@@ -103,14 +104,14 @@ class MainActivity : AppCompatActivity() {
                 return
             }
 
-            updateUi(earthquake!!)
+            updateUi(earthquake)
         }
 
         /**
          * Returns new URL object from the given string URL.
          */
         private fun createUrl(stringUrl: String): URL? {
-            var url: URL? = null
+            val url: URL?
             try {
                 url = URL(stringUrl)
             } catch (exception: MalformedURLException) {
@@ -125,8 +126,13 @@ class MainActivity : AppCompatActivity() {
          * Make an HTTP request to the given URL and return a String as the response.
          */
         @Throws(IOException::class)
-        private fun makeHttpRequest(url: URL): String {
+        private fun makeHttpRequest(url: URL?): String {
             var jsonResponse = ""
+
+            if (url == null) {
+                return jsonResponse
+            }
+
             var urlConnection: HttpURLConnection? = null
             var inputStream: InputStream? = null
             try {
@@ -135,10 +141,17 @@ class MainActivity : AppCompatActivity() {
                 urlConnection.readTimeout = 10000
                 urlConnection.connectTimeout = 15000
                 urlConnection.connect()
+
+                if (urlConnection.responseCode == 200) {
+                    inputStream = urlConnection.inputStream
+                    jsonResponse = readFromStream(inputStream)
+                } else {
+                    Log.e(LOG_TAG, "Response is not ok " + urlConnection.responseCode)
+                }
                 inputStream = urlConnection.inputStream
                 jsonResponse = readFromStream(inputStream)
             } catch (e: IOException) {
-                // TODO: Handle the exception
+                Log.e(LOG_TAG, "Problem retrieving json", e)
             } finally {
                 urlConnection?.disconnect()
                 inputStream?.close()
@@ -170,6 +183,9 @@ class MainActivity : AppCompatActivity() {
          * about the first earthquake from the input earthquakeJSON string.
          */
         private fun extractFeatureFromJson(earthquakeJSON: String): Event? {
+            if (TextUtils.isEmpty(earthquakeJSON)) {
+                return null
+            }
             try {
                 val baseJsonResponse = JSONObject(earthquakeJSON)
                 val featureArray = baseJsonResponse.getJSONArray("features")
@@ -202,6 +218,6 @@ class MainActivity : AppCompatActivity() {
         val LOG_TAG = MainActivity::class.java.simpleName
 
         /** URL to query the USGS dataset for earthquake information  */
-        private val USGS_REQUEST_URL = "https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&starttime=2012-01-01&endtime=2012-12-01&minmagnitude=6"
+        private val USGS_REQUEST_URL = "https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&starttime=2014-01-01&endtime=2014-12-01&minmagnitude=7"
     }
 }
